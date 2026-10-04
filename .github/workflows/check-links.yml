@@ -1,0 +1,16 @@
+name: Check Drive links
+
+on:
+  schedule:
+    - cron: '30 3 * * 1' # Mondays, 09:00 IST
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-links.js
