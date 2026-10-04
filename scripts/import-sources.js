@@ -92,7 +92,10 @@ const REPOS = [
 ];
 
 // Folder/file names with a registration number are personal submissions, not notes.
-const SKIP_PATH = /(^|\/)(\.github|assets|node_modules)(\/|$)|RA\d{10,}/i;
+// Book folders hold full published textbooks, which we don't redistribute.
+const SKIP_PATH = /(^|\/)(\.github|assets|node_modules)(\/|$)|(^|\/)[^/]*\b(text ?)?books?\b[^/]*\/|RA\d{10,}/i;
+// Files jsDelivr refuses (found by the link check); these open on GitHub instead. Format "owner/repo:path".
+const JSDELIVR_BLOCKED = new Set(require('./jsdelivr-blocked.json'));
 const KINDS = { pdf: 'pdf', doc: 'office', docx: 'office', ppt: 'office', pptx: 'office', xls: 'office', xlsx: 'office', jpg: 'image', jpeg: 'image', png: 'image' };
 const PYQ_RE = /end[\s_-]?sem|paper|\bqp\b|\bct[\s_-]?\d|\bct\b|clat|\bcla\b|cla[\s_-]?\d|answer|ans[\s_-]?key|\bkey\b|question|\bqb|qbes|mcq|maq|\bpyqs?\b|(dec|may|nov|jan|jul|april|june)[\s_-]?\d{2}|\bsem\b|prev year|sample|model/i;
 const JSDELIVR_MAX = 20e6;
@@ -201,7 +204,7 @@ async function importRepo(cfg) {
     const name = cleanName(info.rest);
     const isSyllabus = /syl+a?bus/i.test(name);
     const item = { name, kind: KINDS[ext], ext, id: f.path, source: key };
-    if (f.size > JSDELIVR_MAX) item.big = true;
+    if (f.size > JSDELIVR_MAX || JSDELIVR_BLOCKED.has(`${cfg.repo}:${f.path}`)) item.big = true;
     const s = notes.subjects[subjectId];
     if (isSyllabus && !s.syllabus) { s.syllabus = item; added++; continue; }
     if (addItem(subjectId, PYQ_RE.test(name) && !isSyllabus ? 'pyqs' : 'notes', item)) added++;
