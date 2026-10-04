@@ -1,11 +1,16 @@
 # SRM Notes Hub
 
-Notes, PYQs and study material for every SRMIST semester, shared by seniors. Static site, hosted on GitHub Pages; every resource links straight to the original Google Drive files shared by seniors, or to files in [pandeydhruv2001/SRM-Notes-Repository](https://github.com/pandeydhruv2001/SRM-Notes-Repository) served through the jsDelivr CDN. Nothing is stored in this repo.
+Notes, PYQs and study material for every SRMIST semester, shared by seniors. Static site, hosted on GitHub Pages. Nothing is stored in this repo: every resource links to where it already lives:
+
+- **THE HELPER**: the original Drive catalogue (`scripts/source-raw.json`)
+- **GitHub notes repos**: pandeydhruv2001, pulkitshringi (sem 3–6), kunalkeshan (ECE), BharathwajManoharan (CSE, 2018 reg.), orbit-psd2, utkarshtambe10, rajsrm2021, srikrithisanthanam. Linked through jsDelivr (PDFs/images) or raw GitHub (Office files, files over 20 MB), pinned to a commit.
+- **CampusVerse**: extra Drive links and lecture channels (`scripts/source-campusverse.json`)
+- **SRM official end-sem papers**: from SRM's library archive, via the public [SRM PYQ API](https://srm-api-docs.vercel.app), which mirrors the PDFs to public storage
 
 ## How it works
 
 - `data/notes.json` is the whole catalogue (semesters → subjects → sections → items). The site reads only this file.
-- Each item has a Google Drive `id` and `url`. Files open in an in-page viewer (Drive preview), with an "Open in Drive" fallback.
+- Drive items carry an `id` and `url`; GitHub items carry their repo `source` and file path as `id`, and the URL is built from `data.sources`. Files open in an in-page viewer (Drive preview, the browser's PDF viewer, Google's viewer on phones, Office's viewer for Word/PowerPoint). Files over 20 MB open on GitHub instead.
 - No build step: `index.html`, `styles.css`, `app.js`.
 
 ## Run locally
@@ -23,11 +28,12 @@ Then open http://localhost:5180.
    ```json
    { "name": "PYQ May 2026", "kind": "file", "id": "<drive file id>", "url": "https://drive.google.com/file/d/<id>/view" }
    ```
+   Leave out `source` so the importer never removes it.
    Use `"kind": "folder"` and a `/drive/folders/<id>` URL for folders.
 3. Commit and push; GitHub Pages redeploys automatically.
 
 ## Scripts
 
 - `node scripts/check-links.js` checks every link is still public (no login needed). Add `--remove` to drop broken ones from `data/notes.json`. A GitHub Action runs this every Monday and fails if anything broke, which emails the repo owner.
-- `node scripts/import-github.js` pulls in files from the GitHub notes repo (pinned to its latest commit) and merges them into `data/notes.json`. Folders not matched to an existing subject go under *Electives & more*. Safe to re-run when that repo gets new files.
+- `node scripts/import-sources.js` rebuilds everything imported from the sources above (latest commit of each repo, CampusVerse links, official papers) and merges it into `data/notes.json`. Subjects are matched by name; unmatched ones are added to their semester, or *Electives & more* when the semester is unknown. Re-run it whenever the sources get new files. Set `GITHUB_TOKEN` to avoid GitHub's API rate limit.
 - `node scripts/build-catalog.js` rebuilds `data/notes.json` from `scripts/source-raw.json`, the original imported list. Running it overwrites manual edits, so only use it to start over.

@@ -12,6 +12,7 @@
   --pyq: #b45309;  --pyq-soft: #fff4e5;
   --note: #047857; --note-soft: #e7f8f0;
   --strat: #be185d; --strat-soft: #fdecf4;
+  --off: #1d4ed8; --off-soft: #e8efff;
   --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
   --radius: 14px;
   color-scheme: light;
@@ -24,6 +25,7 @@
     --pyq: #fbbf24; --pyq-soft: #33270f;
     --note: #34d399; --note-soft: #0f2c22;
     --strat: #f472b6; --strat-soft: #33162a;
+    --off: #60a5fa; --off-soft: #13233f;
     --shadow: none;
     color-scheme: dark;
   }
@@ -35,6 +37,7 @@
   --pyq: #fbbf24; --pyq-soft: #33270f;
   --note: #34d399; --note-soft: #0f2c22;
   --strat: #f472b6; --strat-soft: #33162a;
+  --off: #60a5fa; --off-soft: #13233f;
   --shadow: none;
   color-scheme: dark;
 }
@@ -147,6 +150,8 @@ main.container { flex: 1; padding-top: 20px; padding-bottom: 40px; outline: none
 .chip.pyqs { background: var(--pyq-soft); color: var(--pyq); }
 .chip.notes { background: var(--note-soft); color: var(--note); }
 .chip.strategies { background: var(--strat-soft); color: var(--strat); }
+.chip.official { background: var(--off-soft); color: var(--off); }
+.chip.videos { background: var(--surface-2); color: var(--text-2); }
 
 /* Subject page */
 .subject-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -178,6 +183,7 @@ main.container { flex: 1; padding-top: 20px; padding-bottom: 40px; outline: none
 .res[data-sec="pyqs"] .res-icon { background: var(--pyq-soft); color: var(--pyq); }
 .res[data-sec="notes"] .res-icon { background: var(--note-soft); color: var(--note); }
 .res[data-sec="strategies"] .res-icon { background: var(--strat-soft); color: var(--strat); }
+.res[data-sec="official"] .res-icon { background: var(--off-soft); color: var(--off); }
 .res-text { min-width: 0; flex: 1; }
 .res-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .res-kind { font-size: 12px; color: var(--text-3); }
@@ -208,5 +214,7 @@ mark { background: var(--accent-soft); color: var(--accent-text); border-radius:
 
 .footer { padding-top: 20px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); color: var(--text-3); font-size: 13px; border-top: 1px solid var(--border); }
 .footer p { margin: 0; }
+.footer .credits { margin-top: 8px; line-height: 1.7; }
+.footer .credits a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

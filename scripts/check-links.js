@@ -12,16 +12,24 @@ const notes = JSON.parse(fs.readFileSync(NOTES, 'utf8'));
 const remove = process.argv.includes('--remove');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-const checkUrl = item =>
-  item.source ? item.url // GitHub files, served via jsDelivr or raw GitHub
-  : item.kind === 'folder'
-    ? `https://drive.google.com/drive/folders/${item.id}`
-    : `https://drive.google.com/file/d/${item.id}/view`;
+const DRIVE_KINDS = new Set(['file', 'folder', 'doc', 'slides', 'sheet']);
+
+// Mirrors itemUrl() in app.js.
+function checkUrl(item) {
+  if (DRIVE_KINDS.has(item.kind)) {
+    return item.kind === 'folder' ? `https://drive.google.com/drive/folders/${item.id}` : `https://drive.google.com/file/d/${item.id}/view`;
+  }
+  if (item.url) return item.url;
+  const src = notes.sources[item.source];
+  const filePath = item.id.split('/').map(encodeURIComponent).join('/');
+  return (item.kind === 'office' || item.big ? src.raw : src.cdn) + filePath;
+}
+const isDrive = item => DRIVE_KINDS.has(item.kind);
 
 // Returns true (works), false (broken) or null (couldn't tell, e.g. Google rate-limited us).
 async function isAlive(item, attempt = 0) {
   try {
-    const res = await fetch(checkUrl(item), { redirect: 'manual', method: item.source ? 'HEAD' : 'GET' });
+    const res = await fetch(checkUrl(item), { redirect: 'manual', method: isDrive(item) ? 'GET' : 'HEAD' });
     if (res.status === 200) return true;
     // Google answers bursts of requests with a redirect to its "unusual traffic" page.
     if (/google\.com\/sorry/.test(res.headers.get('location') || '')) return null;
@@ -45,9 +53,10 @@ async function isAlive(item, attempt = 0) {
   const dead = [];
   let unknown = 0;
   // Drive is checked gently (Google rate-limits bursts); the CDNs can take more at once.
+  // External links (YouTube channels, Notion pages) aren't checked.
   const groups = [
-    { entries: entries.filter(e => !e.item.source), size: 3, pause: 400 },
-    { entries: entries.filter(e => e.item.source), size: 10, pause: 0 },
+    { entries: entries.filter(e => isDrive(e.item)), size: 3, pause: 400 },
+    { entries: entries.filter(e => !isDrive(e.item) && e.item.kind !== 'link'), size: 10, pause: 0 },
   ];
   let done = 0;
   for (const g of groups) {
@@ -74,7 +83,7 @@ async function isAlive(item, attempt = 0) {
       for (const sec of s.sections) sec.items = sec.items.filter(it => !deadItems.has(it));
       s.sections = s.sections.filter(sec => sec.items.length);
     }
-    fs.writeFileSync(NOTES, JSON.stringify(notes, null, 1));
+    fs.writeFileSync(NOTES, JSON.stringify(notes));
     console.log('Removed them from data/notes.json');
   }
   process.exitCode = dead.length && !remove ? 1 : 0;

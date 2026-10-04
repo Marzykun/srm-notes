@@ -8,10 +8,23 @@
   const viewerTitle = document.getElementById('viewer-title');
   const viewerOpen = document.getElementById('viewer-open');
 
-  const SECTION_LABEL = { pyqs: 'PYQs', notes: 'Notes', strategies: 'Strategies' };
-  const KIND_LABEL = { file: 'PDF / File', folder: 'Drive folder', doc: 'Google Doc', slides: 'Slides', sheet: 'Sheet', pdf: 'PDF', image: 'Image' };
-  const isDrive = item => !item.source;
-  const kindLabel = item => item.kind === 'office' ? item.ext.toUpperCase() : KIND_LABEL[item.kind] || 'Link';
+  const SECTION_LABEL = { official: 'Official', pyqs: 'PYQs', notes: 'Notes', videos: 'Links', strategies: 'Strategies' };
+  const KIND_LABEL = { file: 'PDF / File', folder: 'Drive folder', doc: 'Google Doc', slides: 'Slides', sheet: 'Sheet', pdf: 'PDF', image: 'Image', link: 'External link' };
+  const DRIVE_KINDS = new Set(['file', 'folder', 'doc', 'slides', 'sheet']);
+  const isDrive = item => DRIVE_KINDS.has(item.kind);
+  const sourceLabel = item => (data.sources[item.source || 'drive'] || {}).label || '';
+
+  // GitHub items store only their path; the repo's CDN/raw base lives in data.sources.
+  // jsDelivr refuses Office files and anything over 20 MB, so those come from raw GitHub.
+  function itemUrl(item) {
+    if (item.url) return item.url;
+    const src = data.sources[item.source];
+    const filePath = item.id.split('/').map(encodeURIComponent).join('/');
+    return (item.kind === 'office' || item.big ? src.raw : src.cdn) + filePath;
+  }
+  // GitHub's own page for a file; it previews large PDFs that no embeddable viewer will.
+  const githubPage = item => itemUrl(item).replace(/^https:\/\/raw\.githubusercontent\.com\/([^/]+\/[^/]+)\/([0-9a-f]{40})\//, 'https://github.com/$1/blob/$2/');
+  const kindLabel = item => (item.kind === 'office' ? item.ext.toUpperCase() : KIND_LABEL[item.kind] || 'Link') + (item.big ? ' (large, opens on GitHub)' : '');
   const semLabel = n => (n === 'electives' ? 'Electives & more' : `Semester ${n}`);
   const semShort = n => (n === 'electives' ? 'Electives' : `Sem ${n}`);
   const ICONS = {
@@ -20,6 +33,7 @@
     doc: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
     slides: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
     image: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
+    link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>',
     arrow: '<svg class="res-arrow" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
     book: '<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V21h16"/></svg>',
   };
@@ -36,6 +50,10 @@
     'discrete-mathematics': 'dm maths', 'full-stack-web-development': 'fswd web', 'formal-language-and-automata': 'flat toc',
     'computer-networks': 'cn', 'machine-learning': 'ml', 'data-science': 'ds', 'compiler-design': 'cd',
     'foundation-of-data-science-fds': 'fds', 'internet-of-things-iot': 'iot', 'numerical-methods-and-analysis': 'nma',
+    'analog-and-digital-electronics': 'ade', 'management-principles-for-engineers': 'mpe', 'digital-signal-processing': 'dsp',
+    'software-engineering-and-project-management-sepm': 'se software engineering', 'microprocessor-microcontrollers-and-interfacing-techniques': 'mpmc',
+    'remote-sensing-and-gis': 'gis', 'information-storage-management': 'ism', 'data-mining-and-analytics': 'dma dm',
+    'network-routing-algorithm': 'nra', 'wireless-mobile-communication': 'wmc', 'advances-risc-machine': 'arm',
   };
 
   let data = null;
@@ -65,16 +83,16 @@
   function viewHome() {
     const subjects = Object.values(data.subjects);
     const total = flatIndex.length;
-    const pyqs = subjects.reduce((n, s) => n + (countItems(s).pyqs || 0), 0);
+    const pyqs = subjects.reduce((n, s) => n + (countItems(s).pyqs || 0) + (countItems(s).official || 0), 0);
     const recent = store.get('recent', []).map(r => ({ ...r, item: findItem(r.subject, r.sec, r.id) })).filter(r => r.item).slice(0, 6);
 
     app.innerHTML = `
       <section class="hero">
         <h1>Every SRM note, one tap away.</h1>
-        <p>Previous year papers, unit notes and exam tips for all 8 semesters, shared by seniors and served from Google Drive and GitHub.</p>
+        <p>Official end-sem papers, PYQs, unit notes and exam tips for all 8 semesters, gathered from seniors' Drive folders and GitHub repos.</p>
         <div class="stats">
           <span><b>${total}</b> resources</span>
-          <span><b>${pyqs}</b> PYQ sets</span>
+          <span><b>${pyqs}</b> question papers</span>
           <span><b>${subjects.length}</b> subjects</span>
         </div>
       </section>
@@ -127,7 +145,7 @@
   }
 
   function resourceButton(item, secKey, subjectId, showSubject) {
-    const sub = showSubject ? data.subjects[subjectId].name : `${kindLabel(item)}${isDrive(item) ? '' : ' · GitHub'}`;
+    const sub = showSubject ? data.subjects[subjectId].name : `${kindLabel(item)} · ${sourceLabel(item)}`;
     return `<button class="res" data-sec="${secKey}" data-subject="${subjectId}" data-id="${esc(item.id)}" data-key="${secKey}">
       <span class="res-icon">${ICONS[item.kind === 'office' && /^pptx?$/.test(item.ext) ? 'slides' : item.kind === 'office' ? 'doc' : item.kind] || ICONS.file}</span>
       <span class="res-text">
@@ -222,9 +240,10 @@
   const canInlinePdf = navigator.pdfViewerEnabled && !matchMedia('(pointer: coarse)').matches;
 
   function previewUrl(item) {
-    if (item.kind === 'pdf') return canInlinePdf ? item.url : `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(item.url)}`;
-    if (item.kind === 'office') return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(item.url)}`;
-    if (item.kind === 'image') return item.url;
+    const url = itemUrl(item);
+    if (item.kind === 'pdf') return canInlinePdf ? url : `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(url)}`;
+    if (item.kind === 'office') return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+    if (item.kind === 'image') return url;
     if (item.kind === 'folder') return `https://drive.google.com/embeddedfolderview?id=${item.id}#grid`;
     return `https://drive.google.com/file/d/${item.id}/preview`;
   }
@@ -237,12 +256,16 @@
       recent.unshift({ id: item.id, sec: secKey, subject: subjectId });
       store.set('recent', recent.slice(0, 12));
     }
+    // External pages (YouTube channels, Notion) can't be framed; open them directly.
+    if (item.kind === 'link' || item.big || typeof viewer.showModal !== 'function') {
+      window.open(item.big ? githubPage(item) : itemUrl(item), '_blank', 'noopener');
+      return;
+    }
     viewerTitle.textContent = item.name;
-    viewerOpen.href = item.url;
+    viewerOpen.href = itemUrl(item);
     viewerOpen.textContent = isDrive(item) ? 'Open in Drive' : 'Open file';
     viewerFrame.src = previewUrl(item);
-    if (typeof viewer.showModal === 'function') viewer.showModal();
-    else window.open(item.url, '_blank', 'noopener');
+    viewer.showModal();
   }
 
   function closeViewer() {
@@ -325,6 +348,9 @@
           }
         }
       }
+      const seen = new Set();
+      const credits = Object.values(data.sources || {}).filter(src => !seen.has(src.label) && seen.add(src.label));
+      document.getElementById('credits').innerHTML = `Sources: ${credits.map(src => `<a href="${esc(src.home)}" target="_blank" rel="noopener">${esc(src.label)}</a>`).join(' · ')}`;
       route();
     })
     .catch(() => { app.innerHTML = '<div class="empty-state"><h3>Couldn\'t load notes</h3><p>Check your connection and refresh.</p></div>'; });
