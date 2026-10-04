@@ -9,12 +9,17 @@
   const viewerOpen = document.getElementById('viewer-open');
 
   const SECTION_LABEL = { pyqs: 'PYQs', notes: 'Notes', strategies: 'Strategies' };
-  const KIND_LABEL = { file: 'PDF / File', folder: 'Drive folder', doc: 'Google Doc', slides: 'Slides', sheet: 'Sheet' };
+  const KIND_LABEL = { file: 'PDF / File', folder: 'Drive folder', doc: 'Google Doc', slides: 'Slides', sheet: 'Sheet', pdf: 'PDF', image: 'Image' };
+  const isDrive = item => !item.source;
+  const kindLabel = item => item.kind === 'office' ? item.ext.toUpperCase() : KIND_LABEL[item.kind] || 'Link';
+  const semLabel = n => (n === 'electives' ? 'Electives & more' : `Semester ${n}`);
+  const semShort = n => (n === 'electives' ? 'Electives' : `Sem ${n}`);
   const ICONS = {
     file: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
     folder: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
     doc: '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
     slides: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+    image: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
     arrow: '<svg class="res-arrow" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>',
     book: '<svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5V21h16"/></svg>',
   };
@@ -66,7 +71,7 @@
     app.innerHTML = `
       <section class="hero">
         <h1>Every SRM note, one tap away.</h1>
-        <p>Previous year papers, unit notes and exam tips for all 8 semesters, shared by seniors and kept on Google Drive.</p>
+        <p>Previous year papers, unit notes and exam tips for all 8 semesters, shared by seniors and served from Google Drive and GitHub.</p>
         <div class="stats">
           <span><b>${total}</b> resources</span>
           <span><b>${pyqs}</b> PYQ sets</span>
@@ -81,8 +86,8 @@
         ${Object.entries(data.semesters).map(([n, ids]) => {
           const filled = ids.filter(id => data.subjects[id].sections.length).length;
           return `<a class="sem-card" href="#/sem/${n}">
-            <span class="num">${n}</span>
-            <span class="label">Semester ${n}</span>
+            <span class="num">${n === 'electives' ? '+' : n}</span>
+            <span class="label">${semLabel(n)}</span>
             <span class="meta">${filled} of ${ids.length} subjects have notes</span>
           </a>`;
         }).join('')}
@@ -91,7 +96,7 @@
 
   function semTabs(active) {
     return `<nav class="sem-tabs" aria-label="Semesters">
-      ${Object.keys(data.semesters).map(n => `<a class="sem-tab" href="#/sem/${n}" ${String(n) === String(active) ? 'aria-current="page"' : ''}>Sem ${n}</a>`).join('')}
+      ${Object.keys(data.semesters).map(n => `<a class="sem-tab" href="#/sem/${n}" ${String(n) === String(active) ? 'aria-current="page"' : ''}>${semShort(n)}</a>`).join('')}
     </nav>`;
   }
 
@@ -104,7 +109,7 @@
       ${semTabs(n)}
       <div class="page-head">
         <div>
-          <h1>Semester ${n}</h1>
+          <h1>${semLabel(n)}</h1>
           <div class="sub">${ids.length} subjects</div>
         </div>
       </div>
@@ -122,9 +127,9 @@
   }
 
   function resourceButton(item, secKey, subjectId, showSubject) {
-    const sub = showSubject ? data.subjects[subjectId].name : KIND_LABEL[item.kind] || 'Link';
+    const sub = showSubject ? data.subjects[subjectId].name : `${kindLabel(item)}${isDrive(item) ? '' : ' · GitHub'}`;
     return `<button class="res" data-sec="${secKey}" data-subject="${subjectId}" data-id="${esc(item.id)}" data-key="${secKey}">
-      <span class="res-icon">${ICONS[item.kind] || ICONS.file}</span>
+      <span class="res-icon">${ICONS[item.kind === 'office' && /^pptx?$/.test(item.ext) ? 'slides' : item.kind === 'office' ? 'doc' : item.kind] || ICONS.file}</span>
       <span class="res-text">
         <span class="res-name">${esc(item.name)}</span>
         <span class="res-kind">${esc(sub)}</span>
@@ -143,12 +148,12 @@
     app.innerHTML = `
       <div class="crumbs">
         <a href="#/">Home</a><span>/</span>
-        <a href="#/sem/${sem}">Semester ${sem}</a>
+        <a href="#/sem/${sem}">${semLabel(sem)}</a>
       </div>
       <div class="page-head">
         <div>
           <h1>${esc(s.name)}</h1>
-          <div class="sub">${s.semesters.length > 1 ? `Semesters ${s.semesters.join(', ')}` : `Semester ${sem}`}</div>
+          <div class="sub">${s.semesters.length > 1 ? `Semesters ${s.semesters.join(', ')}` : semLabel(sem)}</div>
         </div>
         <div class="subject-actions">
           ${s.syllabus ? `<button class="btn" data-syllabus="${id}">${ICONS.book}Syllabus</button>` : ''}
@@ -191,7 +196,7 @@
         <div class="subject-grid">${subjects.map(([id, s]) => `
           <a class="subject-card ${s.sections.length ? '' : 'empty'}" href="#/s/${id}?sem=${s.semesters[0]}">
             <h3>${hl(s.name)}</h3>
-            <div class="chips"><span class="chip">Sem ${s.semesters.join(', ')}</span>${chipsFor(s)}</div>
+            <div class="chips"><span class="chip">${s.semesters.map(semShort).join(', ')}</span>${chipsFor(s)}</div>
           </a>`).join('')}</div>
       </div>` : ''}
       ${items.length ? `<div class="search-group">
@@ -213,7 +218,13 @@
     return sec && sec.items.find(i => i.id === itemId);
   }
 
+  // Phones can't render PDFs inside an iframe, so route them through Google's viewer.
+  const canInlinePdf = navigator.pdfViewerEnabled && !matchMedia('(pointer: coarse)').matches;
+
   function previewUrl(item) {
+    if (item.kind === 'pdf') return canInlinePdf ? item.url : `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(item.url)}`;
+    if (item.kind === 'office') return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(item.url)}`;
+    if (item.kind === 'image') return item.url;
     if (item.kind === 'folder') return `https://drive.google.com/embeddedfolderview?id=${item.id}#grid`;
     return `https://drive.google.com/file/d/${item.id}/preview`;
   }
@@ -228,6 +239,7 @@
     }
     viewerTitle.textContent = item.name;
     viewerOpen.href = item.url;
+    viewerOpen.textContent = isDrive(item) ? 'Open in Drive' : 'Open file';
     viewerFrame.src = previewUrl(item);
     if (typeof viewer.showModal === 'function') viewer.showModal();
     else window.open(item.url, '_blank', 'noopener');
@@ -236,7 +248,8 @@
   function closeViewer() {
     viewer.close();
   }
-  viewer.addEventListener('close', () => { viewerFrame.src = 'about:blank'; });
+  // The close event fires async; skip the reset if another file was opened meanwhile.
+  viewer.addEventListener('close', () => { if (!viewer.open) viewerFrame.src = 'about:blank'; });
   viewer.querySelector('[data-close]').addEventListener('click', closeViewer);
   viewer.addEventListener('click', e => { if (e.target === viewer) closeViewer(); });
 

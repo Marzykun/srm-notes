@@ -1,6 +1,6 @@
 # SRM Notes Hub
 
-Notes, PYQs and study material for every SRMIST semester, shared by seniors. Static site, hosted on GitHub Pages; every resource links straight to the original Google Drive files shared by seniors, so nothing is stored in this repo.
+Notes, PYQs and study material for every SRMIST semester, shared by seniors. Static site, hosted on GitHub Pages; every resource links straight to the original Google Drive files shared by seniors, or to files in [pandeydhruv2001/SRM-Notes-Repository](https://github.com/pandeydhruv2001/SRM-Notes-Repository) served through the jsDelivr CDN. Nothing is stored in this repo.
 
 ## How it works
 
@@ -29,4 +29,5 @@ Then open http://localhost:5180.
 ## Scripts
 
 - `node scripts/check-links.js` checks every link is still public (no login needed). Add `--remove` to drop broken ones from `data/notes.json`. A GitHub Action runs this every Monday and fails if anything broke, which emails the repo owner.
+- `node scripts/import-github.js` pulls in files from the GitHub notes repo (pinned to its latest commit) and merges them into `data/notes.json`. Folders not matched to an existing subject go under *Electives & more*. Safe to re-run when that repo gets new files.
 - `node scripts/build-catalog.js` rebuilds `data/notes.json` from `scripts/source-raw.json`, the original imported list. Running it overwrites manual edits, so only use it to start over.

@@ -1,4 +1,4 @@
-// Checks that every Drive link in data/notes.json is still publicly viewable.
+// Checks that every Drive and GitHub link in data/notes.json is still publicly viewable.
 // No login needed: a public link answers 200, a deleted/private one doesn't.
 //
 //   node scripts/check-links.js            # report broken links
@@ -10,22 +10,28 @@ const path = require('path');
 const NOTES = path.join(__dirname, '..', 'data', 'notes.json');
 const notes = JSON.parse(fs.readFileSync(NOTES, 'utf8'));
 const remove = process.argv.includes('--remove');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const checkUrl = item =>
-  item.kind === 'folder'
+  item.source ? item.url // GitHub files, served via jsDelivr or raw GitHub
+  : item.kind === 'folder'
     ? `https://drive.google.com/drive/folders/${item.id}`
     : `https://drive.google.com/file/d/${item.id}/view`;
 
+// Returns true (works), false (broken) or null (couldn't tell, e.g. Google rate-limited us).
 async function isAlive(item, attempt = 0) {
   try {
-    const res = await fetch(checkUrl(item), { redirect: 'manual' });
-    if (res.status === 429 && attempt < 3) {
-      await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+    const res = await fetch(checkUrl(item), { redirect: 'manual', method: item.source ? 'HEAD' : 'GET' });
+    if (res.status === 200) return true;
+    // Google answers bursts of requests with a redirect to its "unusual traffic" page.
+    if (/google\.com\/sorry/.test(res.headers.get('location') || '')) return null;
+    if (attempt < 2) {
+      await sleep(2000 * (attempt + 1));
       return isAlive(item, attempt + 1);
     }
-    return res.status === 200;
+    return false;
   } catch (e) {
-    return attempt < 2 ? isAlive(item, attempt + 1) : true; // network blip: don't flag
+    return attempt < 2 ? isAlive(item, attempt + 1) : null;
   }
 }
 
@@ -37,13 +43,28 @@ async function isAlive(item, attempt = 0) {
   }
 
   const dead = [];
-  for (let i = 0; i < entries.length; i += 10) {
-    const batch = entries.slice(i, i + 10);
-    const results = await Promise.all(batch.map(e => isAlive(e.item)));
-    batch.forEach((e, k) => !results[k] && dead.push(e));
-    process.stdout.write(`\rChecked ${Math.min(i + 10, entries.length)}/${entries.length}`);
+  let unknown = 0;
+  // Drive is checked gently (Google rate-limits bursts); the CDNs can take more at once.
+  const groups = [
+    { entries: entries.filter(e => !e.item.source), size: 3, pause: 400 },
+    { entries: entries.filter(e => e.item.source), size: 10, pause: 0 },
+  ];
+  let done = 0;
+  for (const g of groups) {
+    for (let i = 0; i < g.entries.length; i += g.size) {
+      const batch = g.entries.slice(i, i + g.size);
+      const results = await Promise.all(batch.map(e => isAlive(e.item)));
+      batch.forEach((e, k) => {
+        if (results[k] === false) dead.push(e);
+        else if (results[k] === null) unknown++;
+      });
+      done += batch.length;
+      process.stdout.write(`\rChecked ${done}/${entries.length}`);
+      if (g.pause) await sleep(g.pause);
+    }
   }
-  console.log(`\n${dead.length} broken link(s)`);
+
+  console.log(`\n${dead.length} broken link(s)${unknown ? `; ${unknown} couldn't be checked (rate-limited, re-run later)` : ''}`);
   for (const e of dead) console.log(`  - ${notes.subjects[e.subject].name} / ${e.where} / ${e.item.name}`);
 
   if (remove && dead.length) {
